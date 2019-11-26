@@ -9,31 +9,34 @@ import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.ComponentScan;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.stereotype.Component;
 
 @SpringBootApplication
+@ComponentScan({"ro.raft.migrationBatch","ro.astl"})
+
 @EnableScheduling
 @Component
 public class MigrationBatchApplication {
-	
+
 	@Autowired
-    JobLauncher jobLauncher;
-      
-    @Autowired
-    Job job;
+	JobLauncher jobLauncher;
+
+	@Autowired
+	Job job;
 
 	public static void main(String[] args) {
 		SpringApplication.run(MigrationBatchApplication.class, args);
 
 	}
 
-	 @PostConstruct
-	    public void perform() throws Exception {
-	        JobParameters params = new JobParametersBuilder()
-	                .addString("JobID", String.valueOf(System.currentTimeMillis()))
-	                .toJobParameters();
-	        jobLauncher.run(job, params);
-	    }
-	
+	@PostConstruct
+	public void perform() throws Exception {
+		JobParameters params = new JobParametersBuilder()
+
+				.toJobParameters();
+		jobLauncher.run(job, params);
+	}
+
 }
