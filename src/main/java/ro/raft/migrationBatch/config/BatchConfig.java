@@ -1,9 +1,11 @@
 package ro.raft.migrationBatch.config;
 
+import javax.persistence.EntityManagerFactory;
 import javax.sql.DataSource;
 
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
+import org.springframework.batch.core.configuration.annotation.BatchConfigurer;
 import org.springframework.batch.core.configuration.annotation.DefaultBatchConfigurer;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
@@ -13,11 +15,13 @@ import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider;
 import org.springframework.batch.item.database.JdbcBatchItemWriter;
+import org.springframework.batch.item.data.RepositoryItemWriter;
 import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.LineMapper;
 import org.springframework.batch.item.file.mapping.DefaultLineMapper;
 import org.springframework.batch.item.file.mapping.FieldSetMapper;
 import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
+import org.springframework.batch.support.transaction.ResourcelessTransactionManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -32,6 +36,10 @@ import org.springframework.core.io.Resource;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.orm.jpa.JpaTransactionManager;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import ro.astl.services.rfldbapi.country.dao.CountryDaoImpl;
 import ro.astl.services.rfldbapi.country.dao.CountryDaoInterface;
@@ -43,15 +51,19 @@ import ro.raft.migrationBatch.processor.MigrationBatchProcessor;
 import ro.raft.migrationBatch.writer.MigrationBatchWriter;
 
 @Configuration
+@EnableTransactionManagement
 @EnableBatchProcessing
 @EnableJpaRepositories("ro.astl")
-public class BatchConfig extends DefaultBatchConfigurer{
+public class BatchConfig extends DefaultBatchConfigurer implements BatchConfigurer{
 
 	@Autowired
     private JobBuilderFactory jobBuilderFactory;
 
     @Autowired
     private StepBuilderFactory stepBuilderFactory;
+    
+    @Autowired
+    private EntityManagerFactory emf;
     
     @Autowired
     private CountryMapper countryFieldMapper; 
@@ -76,6 +88,7 @@ public class BatchConfig extends DefaultBatchConfigurer{
                 .reader(reader())
                 .processor(processor())
                 .writer(writer())
+                .transactionManager(getBatchTransactionManager())
                 .build();
     }
 
@@ -111,19 +124,20 @@ public class BatchConfig extends DefaultBatchConfigurer{
     
     @Bean
     public ItemWriter<CountryIn> writer() {
-
         return new MigrationBatchWriter();
     }
     
-   
-    @Override
-    public void setDataSource(DataSource dataSource) {
-        // override to do not set datasource even if a datasource exist.
-        // initialize will use a Map based JobRepository (instead of database)
-    }
+
     
     @Bean
     public FieldSetMapper<CountryIn> getMapper(){
     	return new CountryMapper();
     }
+    
+    public PlatformTransactionManager getBatchTransactionManager() {
+    	JpaTransactionManager transactionManager = new JpaTransactionManager();
+    	transactionManager.setEntityManagerFactory(emf);
+    	return transactionManager;
+
+	}
 }
