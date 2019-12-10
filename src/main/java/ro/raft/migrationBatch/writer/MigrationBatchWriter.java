@@ -19,7 +19,7 @@ public class MigrationBatchWriter implements ItemWriter<CountryIn>{
 	public void write(List<? extends CountryIn> items) throws Exception {
 		
 		for(CountryIn countryIn : items) {
-			countryManager.createCountry(countryIn);
+//			countryManager.createCountry(countryIn);
 //			System.out.println("PULA MEA-----------" + countryManager.findCountryByShortName("stringpl"));
 			countryManager.createCountry(countryIn);
 		}
