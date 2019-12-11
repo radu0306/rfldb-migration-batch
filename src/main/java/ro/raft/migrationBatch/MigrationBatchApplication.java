@@ -12,7 +12,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 @SpringBootApplication
 @ComponentScan({"ro.raft.migrationBatch","ro.astl"})
@@ -34,7 +33,7 @@ public class MigrationBatchApplication {
 	@PostConstruct
 	public void perform() throws Exception {
 		JobParameters params = new JobParametersBuilder()
-
+				 .addString("JobID", String.valueOf(System.currentTimeMillis()))
 				.toJobParameters();
 		jobLauncher.run(job, params);
 	}
