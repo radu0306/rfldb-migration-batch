@@ -33,7 +33,7 @@ public class MigrationBatchApplication {
 	@PostConstruct
 	public void perform() throws Exception {
 		JobParameters params = new JobParametersBuilder()
-				 .addString("JobID", String.valueOf(System.currentTimeMillis()))
+				.addString("JobID", String.valueOf(System.currentTimeMillis()))
 				.toJobParameters();
 		jobLauncher.run(job, params);
 	}

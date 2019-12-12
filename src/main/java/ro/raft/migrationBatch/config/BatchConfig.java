@@ -32,17 +32,21 @@ import ro.astl.services.rfldbapi.club.dto.ClubIn;
 import ro.astl.services.rfldbapi.country.dto.CountryIn;
 import ro.astl.services.rfldbapi.country.dto.RegionIn;
 import ro.astl.services.rfldbapi.league.dto.LeagueIn;
+import ro.astl.services.rfldbapi.league.dto.LeagueNodeIn;
 import ro.raft.migrationBatch.mapper.ClubMapper;
 import ro.raft.migrationBatch.mapper.CountryMapper;
 import ro.raft.migrationBatch.mapper.LeagueMapper;
+import ro.raft.migrationBatch.mapper.LeagueNodeMapper;
 import ro.raft.migrationBatch.mapper.RegionMapper;
 import ro.raft.migrationBatch.processor.ClubProcessor;
 import ro.raft.migrationBatch.processor.CountryProcessor;
+import ro.raft.migrationBatch.processor.LeagueNodeProcessor;
 import ro.raft.migrationBatch.processor.LeagueProcessor;
 import ro.raft.migrationBatch.processor.RegionProcessor;
 import ro.raft.migrationBatch.writer.ClubWriter;
 import ro.raft.migrationBatch.writer.LeagueWriter;
 import ro.raft.migrationBatch.writer.CountryWriter;
+import ro.raft.migrationBatch.writer.LeagueNodeWriter;
 import ro.raft.migrationBatch.writer.RegionWriter;
 
 @Configuration
@@ -67,6 +71,9 @@ public class BatchConfig extends DefaultBatchConfigurer implements BatchConfigur
 	private RegionMapper regionFieldMapper;
 	
 	@Autowired
+	private LeagueNodeMapper leagueNodeFieldMapper;
+		
+	@Autowired
 	private LeagueMapper leagueFieldMapper;
 	
 	@Autowired
@@ -77,24 +84,34 @@ public class BatchConfig extends DefaultBatchConfigurer implements BatchConfigur
 
 	@Value("classPath:/input/RegionList.csv")
 	private Resource regionResource;
+	
+	@Value("classPath:/input/LeagueNodes.csv")
+	private Resource leagueNodesResource;
 
 	@Value("classPath:/input/LeaguesList.csv")
 	private Resource leagueResource;
 	
-	@Value("classPath:/input/ClubList.csv")
+	@Value("classPath:/input/ClubsList.csv")
 	private Resource clubResource;
 	
 	@Bean
 	public Job readCSVFileJob() {
-		return jobBuilderFactory.get("readCountryCSVJob").incrementer(new RunIdIncrementer()).start(countryStep())
-				.next(regionStep()).build();
+		return jobBuilderFactory
+				.get("readCountryCSVJob")
+				.incrementer(new RunIdIncrementer())
+				.start(countryStep())
+				.next(regionStep())
+				.next(leagueNodeStep())
+				.next(leagueStep())
+				.next(clubStep())
+				.build();
 	}
 
 	@Bean
 	public Step countryStep() {
 		return stepBuilderFactory
 				.get("countryStep")
-				.<CountryIn, CountryIn>chunk(5)
+				.<CountryIn, CountryIn>chunk(100)
 				.reader(countryReader())
 				.processor(countryProcessor())
 				.writer(countryWriter())
@@ -106,13 +123,25 @@ public class BatchConfig extends DefaultBatchConfigurer implements BatchConfigur
 	public Step regionStep() {
 		return stepBuilderFactory
 				.get("regionStep")
-				.<RegionIn, RegionIn>chunk(5)
+				.<RegionIn, RegionIn>chunk(20)
 				.reader(regionReader())
 				.processor(regionProcessor())
 				.writer(regionWriter())
 				.transactionManager(getBatchTransactionManager())
 				.build();
 
+	}
+	
+	@Bean
+	public Step leagueNodeStep() {
+		return stepBuilderFactory
+				.get("leagueNodeStep")
+				.<LeagueNodeIn, LeagueNodeIn>chunk(5)
+				.reader(leagueNodeReader())
+				.processor(leagueNodeProcessor())
+				.writer(leagueNodeWriter())
+				.transactionManager(getBatchTransactionManager())
+				.build();
 	}
 
 	@Bean
@@ -131,7 +160,7 @@ public class BatchConfig extends DefaultBatchConfigurer implements BatchConfigur
 	public Step clubStep() {
 		return stepBuilderFactory
 				.get("clubStep")
-				.<ClubIn, ClubIn>chunk(5)
+				.<ClubIn, ClubIn>chunk(500)
 				.reader(clubReader())
 				.processor(clubProcessor())
 				.writer(clubWriter())
@@ -154,11 +183,19 @@ public class BatchConfig extends DefaultBatchConfigurer implements BatchConfigur
 		FlatFileItemReader<RegionIn> itemReader = new FlatFileItemReader<RegionIn>();
 		itemReader.setLineMapper(regionLineMapper());
 		itemReader.setLinesToSkip(1);
-		itemReader.setResource(countryResource);
+		itemReader.setResource(regionResource);
 		return itemReader;
 
 	}
 
+	private FlatFileItemReader<LeagueNodeIn> leagueNodeReader() {
+		FlatFileItemReader<LeagueNodeIn> itemReader = new FlatFileItemReader<LeagueNodeIn>();
+		itemReader.setLineMapper(leagueNodeLineMapper());
+		itemReader.setLinesToSkip(1);
+		itemReader.setResource(leagueNodesResource);
+		return itemReader;
+	}
+	
 	private FlatFileItemReader<LeagueIn> leagueReader() {
 		FlatFileItemReader<LeagueIn> itemReader = new FlatFileItemReader<LeagueIn>();
 		itemReader.setLineMapper(leagueLineMapper());
@@ -186,6 +223,11 @@ public class BatchConfig extends DefaultBatchConfigurer implements BatchConfigur
 	}
 	
 	@Bean
+	public ItemProcessor<LeagueNodeIn, LeagueNodeIn> leagueNodeProcessor() {
+		return new LeagueNodeProcessor();
+	}
+	
+	@Bean
 	public ItemProcessor<LeagueIn, LeagueIn> leagueProcessor() {
 		return new LeagueProcessor();
 	}
@@ -203,6 +245,11 @@ public class BatchConfig extends DefaultBatchConfigurer implements BatchConfigur
 	@Bean
 	public ItemWriter<RegionIn> regionWriter() {
 		return new RegionWriter();
+	}
+	
+	@Bean
+	public ItemWriter<LeagueNodeIn> leagueNodeWriter() {
+		return new LeagueNodeWriter();
 	}
 	
 	@Bean
@@ -251,12 +298,27 @@ public class BatchConfig extends DefaultBatchConfigurer implements BatchConfigur
 	}
 	
 	@Bean
+	public LineMapper<LeagueNodeIn> leagueNodeLineMapper() {
+		DefaultLineMapper<LeagueNodeIn> lineMapper = new DefaultLineMapper<LeagueNodeIn>();
+		DelimitedLineTokenizer lineTokenizer = new DelimitedLineTokenizer();
+
+		lineTokenizer.setDelimiter(",");
+		lineTokenizer.setNames(new String[] { "CountryShortName", "IsRegional" });
+		lineTokenizer.setIncludedFields(new int[] { 0, 1});
+
+		lineMapper.setLineTokenizer(lineTokenizer);
+		lineMapper.setFieldSetMapper(leagueNodeFieldMapper);
+
+		return lineMapper;
+	}
+	
+	@Bean
 	public LineMapper<LeagueIn> leagueLineMapper() {
 		DefaultLineMapper<LeagueIn> lineMapper = new DefaultLineMapper<LeagueIn>();
 		DelimitedLineTokenizer lineTokenizer = new DelimitedLineTokenizer();
 
 		lineTokenizer.setDelimiter(",");
-		lineTokenizer.setNames(new String[] { "LeagueName", "LeageNode", "RegionName", "RegionShortName" });
+		lineTokenizer.setNames(new String[] { "LeagueName", "LeagueNode", "RegionName", "RegionShortName" });
 		lineTokenizer.setIncludedFields(new int[] { 0, 1, 2, 3});
 
 		lineMapper.setLineTokenizer(lineTokenizer);
