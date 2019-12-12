@@ -28,17 +28,21 @@ import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
+import ro.astl.services.rfldbapi.club.dto.ClubIn;
 import ro.astl.services.rfldbapi.country.dto.CountryIn;
 import ro.astl.services.rfldbapi.country.dto.RegionIn;
 import ro.astl.services.rfldbapi.league.dto.LeagueIn;
+import ro.raft.migrationBatch.mapper.ClubMapper;
 import ro.raft.migrationBatch.mapper.CountryMapper;
 import ro.raft.migrationBatch.mapper.LeagueMapper;
 import ro.raft.migrationBatch.mapper.RegionMapper;
+import ro.raft.migrationBatch.processor.ClubProcessor;
 import ro.raft.migrationBatch.processor.CountryProcessor;
 import ro.raft.migrationBatch.processor.LeagueProcessor;
 import ro.raft.migrationBatch.processor.RegionProcessor;
+import ro.raft.migrationBatch.writer.ClubWriter;
 import ro.raft.migrationBatch.writer.LeagueWriter;
-import ro.raft.migrationBatch.writer.MigrationBatchWriter;
+import ro.raft.migrationBatch.writer.CountryWriter;
 import ro.raft.migrationBatch.writer.RegionWriter;
 
 @Configuration
@@ -64,6 +68,9 @@ public class BatchConfig extends DefaultBatchConfigurer implements BatchConfigur
 	
 	@Autowired
 	private LeagueMapper leagueFieldMapper;
+	
+	@Autowired
+	private ClubMapper clubFieldMapper;
 
 	@Value("classPath:/input/countryList.csv")
 	private Resource countryResource;
@@ -74,6 +81,9 @@ public class BatchConfig extends DefaultBatchConfigurer implements BatchConfigur
 	@Value("classPath:/input/LeaguesList.csv")
 	private Resource leagueResource;
 	
+	@Value("classPath:/input/ClubList.csv")
+	private Resource clubResource;
+	
 	@Bean
 	public Job readCSVFileJob() {
 		return jobBuilderFactory.get("readCountryCSVJob").incrementer(new RunIdIncrementer()).start(countryStep())
@@ -82,15 +92,25 @@ public class BatchConfig extends DefaultBatchConfigurer implements BatchConfigur
 
 	@Bean
 	public Step countryStep() {
-		return stepBuilderFactory.get("countryStep").<CountryIn, CountryIn>chunk(5).reader(countryReader())
-				.processor(countryProcessor()).writer(countryWriter()).transactionManager(getBatchTransactionManager())
+		return stepBuilderFactory
+				.get("countryStep")
+				.<CountryIn, CountryIn>chunk(5)
+				.reader(countryReader())
+				.processor(countryProcessor())
+				.writer(countryWriter())
+				.transactionManager(getBatchTransactionManager())
 				.build();
 	}
 
 	@Bean
 	public Step regionStep() {
-		return stepBuilderFactory.get("regionStep").<RegionIn, RegionIn>chunk(5).reader(regionReader())
-				.processor(regionProcessor()).writer(regionWriter()).transactionManager(getBatchTransactionManager())
+		return stepBuilderFactory
+				.get("regionStep")
+				.<RegionIn, RegionIn>chunk(5)
+				.reader(regionReader())
+				.processor(regionProcessor())
+				.writer(regionWriter())
+				.transactionManager(getBatchTransactionManager())
 				.build();
 
 	}
@@ -103,6 +123,18 @@ public class BatchConfig extends DefaultBatchConfigurer implements BatchConfigur
 				.reader(leagueReader())
 				.processor(leagueProcessor())
 				.writer(leagueWriter())
+				.transactionManager(getBatchTransactionManager())
+				.build();
+	}
+	
+	@Bean
+	public Step clubStep() {
+		return stepBuilderFactory
+				.get("clubStep")
+				.<ClubIn, ClubIn>chunk(5)
+				.reader(clubReader())
+				.processor(clubProcessor())
+				.writer(clubWriter())
 				.transactionManager(getBatchTransactionManager())
 				.build();
 	}
@@ -134,6 +166,14 @@ public class BatchConfig extends DefaultBatchConfigurer implements BatchConfigur
 		itemReader.setResource(leagueResource);
 		return itemReader;
 	}
+	
+	private FlatFileItemReader<ClubIn> clubReader() {
+		FlatFileItemReader<ClubIn> itemReader = new FlatFileItemReader<ClubIn>();
+		itemReader.setLineMapper(clubLineMapper());
+		itemReader.setLinesToSkip(1);
+		itemReader.setResource(clubResource);
+		return itemReader;
+	}
 
 	@Bean
 	public ItemProcessor<CountryIn, CountryIn> countryProcessor() {
@@ -149,10 +189,15 @@ public class BatchConfig extends DefaultBatchConfigurer implements BatchConfigur
 	public ItemProcessor<LeagueIn, LeagueIn> leagueProcessor() {
 		return new LeagueProcessor();
 	}
+	
+	@Bean
+	public ItemProcessor<ClubIn, ClubIn> clubProcessor() {
+		return new ClubProcessor();
+	}
 
 	@Bean
 	public ItemWriter<CountryIn> countryWriter() {
-		return new MigrationBatchWriter();
+		return new CountryWriter();
 	}
 
 	@Bean
@@ -163,6 +208,11 @@ public class BatchConfig extends DefaultBatchConfigurer implements BatchConfigur
 	@Bean
 	public ItemWriter<LeagueIn> leagueWriter() {
 		return new LeagueWriter();
+	}
+	
+	@Bean
+	public ItemWriter<ClubIn> clubWriter() {
+		return new ClubWriter();
 	}
 
 	@Bean
@@ -211,6 +261,21 @@ public class BatchConfig extends DefaultBatchConfigurer implements BatchConfigur
 
 		lineMapper.setLineTokenizer(lineTokenizer);
 		lineMapper.setFieldSetMapper(leagueFieldMapper);
+
+		return lineMapper;
+	}
+	
+	@Bean
+	public LineMapper<ClubIn> clubLineMapper() {
+		DefaultLineMapper<ClubIn> lineMapper = new DefaultLineMapper<ClubIn>();
+		DelimitedLineTokenizer lineTokenizer = new DelimitedLineTokenizer();
+
+		lineTokenizer.setDelimiter(",");
+		lineTokenizer.setNames(new String[] { "ClubName", "ClubNameShort", "CountryName", "LeagueName", "ClubFMId" });
+		lineTokenizer.setIncludedFields(new int[] { 0, 1, 2, 3, 4});
+
+		lineMapper.setLineTokenizer(lineTokenizer);
+		lineMapper.setFieldSetMapper(clubFieldMapper);
 
 		return lineMapper;
 	}

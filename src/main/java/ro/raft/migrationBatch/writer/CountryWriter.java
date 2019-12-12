@@ -8,7 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import ro.astl.services.rfldbapi.country.dto.CountryIn;
 import ro.astl.services.rfldbapi.country.manager.CountryManager;
 
-public class MigrationBatchWriter implements ItemWriter<CountryIn>{
+public class CountryWriter implements ItemWriter<CountryIn>{
 
 	@Autowired
 	private CountryManager countryManager;

@@ -2,11 +2,13 @@ package ro.raft.migrationBatch.mapper;
 
 import org.springframework.batch.item.file.mapping.FieldSetMapper;
 import org.springframework.batch.item.file.transform.FieldSet;
+import org.springframework.stereotype.Component;
 import org.springframework.validation.BindException;
 
 import ro.astl.services.rfldbapi.country.dto.RegionIn;
 import ro.raft.migrationBatch.constants.MigrationBatchConstants;
 
+@Component
 public class RegionMapper implements FieldSetMapper<RegionIn>{
 
 	@Override
